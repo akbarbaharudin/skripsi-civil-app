@@ -14,21 +14,21 @@ if 'biaya_lama' not in st.session_state:
     st.session_state['biaya_lama'] = 0
 
 st.title("🏗️ Estimasi Biaya Struktur")
-st.caption("Model Parametrik Terkalibrasi (Data Proyek Aktual)")
+st.caption("Model Prediksi Algoritma Random Forest)")
 st.markdown("---")
 
 # --- 3. INPUT USER ---
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("Geometri Struktur")
+    st.subheader("Input Geometri Struktur")
     # Default Value disesuaikan dengan kasusmu biar enak langsung demo
     l = st.number_input("Jumlah Lantai", min_value=1, value=9, step=1)
-    a = st.number_input("Luas Bangunan TOTAL (m²)", min_value=100.0, value=13740.0, step=100.0)
+    a = st.number_input("Luas Bangunan (m²)", min_value=100.0, value=13740.0, step=100.0)
     d = st.number_input("Jarak Antar Kolom (mm)", min_value=2000.0, value=7000.0, step=500.0)
 
 with col2:
-    st.subheader("Harga Satuan Pasar")
+    st.subheader("Input Harga Satuan Pasar")
     # Default Value disesuaikan kasusmu
     p1 = st.number_input("Harga Beton (Rp/m³)", value=1542432, step=5000)
     p2 = st.number_input("Harga Baja (Rp/kg)", value=64670, step=100)
