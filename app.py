@@ -40,7 +40,7 @@ if st.button("HITUNG ESTIMASI", type="primary"):
     
     # === [ FAKTOR KALIBRASI ] ===
     # Target: ~37 Miliar.
-    FAKTOR_KOREKSI = 0.350 
+    FAKTOR_KOREKSI = 0.370 
     
     # 1. Estimasi Volume Beton (m³)
     tebal_ekuivalen = 0.35 + ((d - 6000) / 20000) 
