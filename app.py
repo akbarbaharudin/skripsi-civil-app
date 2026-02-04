@@ -2,86 +2,81 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# --- 1. HARGA REFERENSI (HARUS SAMA DENGAN DATA LATIH) ---
-# Masukkan harga Perwal/Standar yang ada di Excel training data
-REF_HARGA_BETON = 881600      
-REF_HARGA_BAJA = 15000        
-REF_HARGA_BEKISTING = 180000  
+# --- SETUP HALAMAN ---
+st.set_page_config(page_title="Sistem Estimasi Biaya Struktur", layout="centered")
 
-st.set_page_config(page_title="Sistem Estimasi Biaya", layout="centered")
-
+# --- LOAD MODEL ---
 try:
     model = joblib.load('model_final.pkl')
 except:
-    st.error("Model tidak ditemukan.")
+    st.error("❌ File 'model_final.pkl' tidak ditemukan!")
     st.stop()
 
 st.title("🏗️ Kalkulator Biaya Struktur")
+st.markdown("---")
 
-# --- 2. INPUT ---
+# --- 1. INPUT USER (Tampilan Web) ---
 col1, col2 = st.columns(2)
+
 with col1:
-    st.markdown("**Geometri**")
+    st.subheader("Geometri")
+    # Variabel Python (l, a, d) ini hanya penampung sementara
     l = st.number_input("Jumlah Lantai", value=10)
     a = st.number_input("Luas Bangunan (m²)", value=5000.0, step=100.0)
     d = st.number_input("Jarak Antar Kolom (mm)", value=6000.0, step=500.0)
 
 with col2:
-    st.markdown("**Harga Pasar Saat Ini**")
-    p1 = st.number_input("Harga Beton (Rp)", value=int(REF_HARGA_BETON), step=10000)
-    p2 = st.number_input("Harga Baja (Rp)", value=int(REF_HARGA_BAJA), step=100)
-    p3 = st.number_input("Harga Bekisting (Rp)", value=int(REF_HARGA_BEKISTING), step=1000)
+    st.subheader("Harga Satuan")
+    p1 = st.number_input("Harga Beton (Rp)", value=881600, step=10000)
+    p2 = st.number_input("Harga Baja (Rp)", value=15000, step=100)
+    p3 = st.number_input("Harga Bekisting (Rp)", value=180000, step=1000)
 
-if st.button("HITUNG", type="primary"):
+# --- 2. LOGIKA MAPPING CERDAS (JANTUNG PERBAIKAN) ---
+if st.button("HITUNG PREDIKSI", type="primary"):
     
-    # --- DIAGNOSA OTOMATIS URUTAN KOLOM ---
+    # A. Cek Nama Kolom Asli dari Model
     try:
-        urutan_fitur = model.feature_names_in_
-        # st.write("Urutan Model:", urutan_fitur) # Un-comment kalau mau lihat
-        
-        # Mapping Data Sesuai Nama Kolom
-        # Ini akan otomatis menaruh data ke kolom yang benar
-        data_dict = {
-            'Jumlah Lantai': l,
-            'Luas Bangunan (m²)': a,
-            'Jarak Antar Kolom (mm)': d,
-            'Harga Satuan Beton (Rp)': REF_HARGA_BETON,     # Pakai Ref
-            'Harga Satuan Baja (Rp)': REF_HARGA_BAJA,       # Pakai Ref
-            'Harga Satuan Bekisting (Rp)': REF_HARGA_BEKISTING # Pakai Ref
-        }
-        
-        # Kalau nama kolom di data latih beda (misal bahasa Inggris/Singkatan)
-        # Maka kode ini akan error, dan kamu harus sesuaikan key dictionary diatas.
-        
-        # Susun DataFrame otomatis sesuai urutan model
-        input_data = pd.DataFrame([data_dict])[urutan_fitur]
-        
+        urutan_model = model.feature_names_in_
+        st.info(f"📋 Model meminta urutan kolom: {list(urutan_model)}")
     except:
-        # FALLBACK MANUAL (Kalau fitur name tidak terdeteksi)
-        # Asumsi urutan standar [Lantai, Luas, Jarak, Harga...]
-        input_data = pd.DataFrame([[l, a, d, REF_HARGA_BETON, REF_HARGA_BAJA, REF_HARGA_BEKISTING]])
+        st.error("⚠️ Model ini versi lama/tidak menyimpan nama fitur. Cek Google Colab untuk urutan manual!")
+        st.stop()
 
-    # --- HITUNG ---
+    # B. Database Input (Kamus Data)
+    # TUGAS KAMU: Pastikan KATA KUNCI (Kiri) di bawah ini SAMA PERSIS tulisannya
+    # dengan nama kolom yang muncul di kotak biru di layar web nanti.
+    # Kalau di layar tertulis 'Jarak_Kolom', di sini harus 'Jarak_Kolom' juga.
+    
+    kamus_input = {
+        'Jumlah Lantai': l,               # Cek: Apakah model minta 'Jumlah Lantai' atau 'Lantai'?
+        'Luas Bangunan (m²)': a,          # Cek: Apakah model minta satuan (m²) atau tidak?
+        'Jarak Antar Kolom (mm)': d,      # Cek: Apakah model minta (mm) atau tidak?
+        'Harga Satuan Beton (Rp)': p1,    # Cek: Sesuaikan tulisannya
+        'Harga Satuan Baja (Rp)': p2,     # Cek: Sesuaikan tulisannya
+        'Harga Satuan Bekisting (Rp)': p3 # Cek: Sesuaikan tulisannya
+    }
+
+    # C. Auto-Sort (Menyusun Otomatis)
     try:
-        # 1. Prediksi Volume/Biaya Dasar (Fixed Price)
-        base_cost = model.predict(input_data)[0]
+        # Ini langkah ajaibnya. Kita ambil data dari kamus sesuai urutan model.
+        data_urut = []
+        for kolom in urutan_model:
+            # Mencari data di kamus. Jika nama beda dikit, dia akan error (memberi tahu kita)
+            data_urut.append(kamus_input[kolom])
+            
+        # Buat DataFrame yang sudah RAPI 100%
+        input_final = pd.DataFrame([data_urut], columns=urutan_model)
         
-        # 2. Koreksi Matematika (Pasti Benar)
-        # Kita hitung persentase kenaikan harga user
-        idx_beton = p1 / REF_HARGA_BETON
-        idx_baja = p2 / REF_HARGA_BAJA
-        idx_bekis = p3 / REF_HARGA_BEKISTING
+        # Tampilkan tabel yang masuk ke mesin (untuk debugging)
+        st.write("Data yang dikirim ke mesin (Sudah Diurutkan):")
+        st.dataframe(input_final)
+
+        # D. Prediksi
+        hasil = model.predict(input_final)[0]
         
-        # Bobot Struktur (Beton 45%, Baja 35%, Bekis 20%)
-        # Rumus rata-rata tertimbang
-        indeks_gabungan = (idx_beton * 0.45) + (idx_baja * 0.35) + (idx_bekis * 0.20)
+        st.success("✅ Perhitungan Selesai")
+        st.metric("Total Biaya", f"Rp {hasil:,.0f}")
         
-        final_cost = base_cost * indeks_gabungan
-        
-        st.success("Berhasil!")
-        st.metric("Total Biaya", f"Rp {final_cost:,.0f}")
-        st.caption(f"Multiplier Indeks Harga: {indeks_gabungan:.3f}x")
-        
-    except Exception as e:
-        st.error(f"Error: {e}")
-        st.info("Cek nama kolom di Excel data latih kamu, apakah sama persis tulisannya dengan di coding?")
+    except KeyError as e:
+        st.error(f"❌ ERROR NAMA KOLOM: Model meminta kolom bernama {e}, tapi di coding 'kamus_input' belum ada/salah ketik.")
+        st.warning("👉 SOLUSI: Lihat coding baris 48-55. Ganti tulisan di sebelah kiri (Key) agar sama persis dengan nama kolom model.")
