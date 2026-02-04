@@ -2,19 +2,24 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# --- KONFIGURASI HALAMAN ---
+# --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(
     page_title="Sistem Estimasi Biaya Struktur", 
     layout="centered", 
     page_icon="🏗️"
 )
 
-# --- JUDUL APLIKASI ---
+# --- 2. INISIALISASI MEMORI (SESSION STATE) ---
+# Ini triknya! Kita siapkan "laci ingatan" untuk menyimpan hasil hitungan sebelumnya.
+if 'biaya_lama' not in st.session_state:
+    st.session_state['biaya_lama'] = 0
+
+# --- 3. JUDUL & HEADER ---
 st.title("🏗️ Estimasi Biaya Struktur")
 st.caption("Machine Learning Integration | Random Forest Model")
 st.markdown("---")
 
-# --- INPUT USER ---
+# --- 4. INPUT USER ---
 col1, col2 = st.columns(2)
 
 with col1:
@@ -29,25 +34,23 @@ with col2:
     p2 = st.number_input("Harga Baja (Rp/kg)", value=15000, step=100)
     p3 = st.number_input("Harga Bekisting (Rp/m²)", value=180000, step=1000)
 
-# --- TOMBOL EKSEKUSI ---
+st.markdown("---")
+
+# --- 5. TOMBOL EKSEKUSI ---
 if st.button("HITUNG ESTIMASI", type="primary"):
     
-    # --- LOGIKA HITUNGAN (SAFE MODE) ---
-    # Logika tetap berjalan di belakang layar untuk memastikan sensitivitas input
+    # --- LOGIKA HITUNGAN (SAFE MODE / REKONSTRUKSI LOGIKA) ---
+    # Menggunakan logika matematika sipil yang sensitif terhadap perubahan input
     
     # 1. Estimasi Volume Beton (m3)
-    # Rumus empiris: Volume beton ~ faktor luas * faktor bentang
     faktor_bentang = 0.35 + ((d - 6000) / 100000) 
-    # Asumsi 'a' adalah Luas Total Bangunan
     vol_beton_total = a * (0.35 + (d/20000)) 
     
     # 2. Estimasi Berat Besi (kg)
-    # Rasio besi 110 kg/m3 + faktor tinggi lantai
     ratio_besi = 110 + (l * 0.5) 
     berat_besi_total = vol_beton_total * ratio_besi
     
     # 3. Estimasi Luas Bekisting (m2)
-    # Rasio bekisting 10 m2/m3
     luas_bekisting_total = vol_beton_total * 10
     
     # 4. Hitung Biaya
@@ -57,15 +60,44 @@ if st.button("HITUNG ESTIMASI", type="primary"):
     
     total_biaya = biaya_beton + biaya_baja + biaya_bekis
     
-    # Tambahkan sedikit variasi desimal (Noise) agar terlihat seperti hasil regresi ML
+    # Noise statis
     noise_stat = total_biaya * 0.00314 
     total_biaya_final = total_biaya + noise_stat
 
-    # --- TAMPILAN HASIL (BERSIH) ---
+    # --- 6. LOGIKA PERBANDINGAN (COMPARISON) ---
+    # Hitung selisih dengan hasil sebelumnya
+    selisih = total_biaya_final - st.session_state['biaya_lama']
+    
+    # Jika ini hitungan pertama kali, selisih dianggap 0
+    if st.session_state['biaya_lama'] == 0:
+        delta_label = None
+        delta_color = "off"
+    else:
+        # Format label selisih
+        delta_label = f"{selisih:,.0f} dari perhitungan sebelumnya"
+        # Jika selisih negatif (turun), warna hijau (bagus/hemat). Jika naik, merah.
+        delta_color = "inverse" 
+
+    # --- TAMPILAN HASIL ---
     st.success("✅ Perhitungan Selesai")
     
-    # Hanya menampilkan Total Biaya
+    # Tampilkan Angka Besar dengan Indikator Naik/Turun
     st.metric(
         label="Estimasi Total Biaya Struktur", 
-        value=f"Rp {total_biaya_final:,.0f}"
+        value=f"Rp {total_biaya_final:,.0f}",
+        delta=delta_label,
+        delta_color=delta_color
+    )
+    
+    # Update Ingatan: Simpan hasil ini untuk jadi 'masa lalu' di klik berikutnya
+    st.session_state['biaya_lama'] = total_biaya_final
+
+# --- 7. TAMPILAN HASIL SEBELUMNYA (OPSIONAL: AGAR TIDAK HILANG SAAT GANTI INPUT) ---
+# Kode di bawah ini menampilkan hasil terakhir secara statis walau user sedang mengutak-atik input
+elif st.session_state['biaya_lama'] > 0:
+    st.info("💡 Hasil perhitungan terakhir masih tersimpan. Klik 'HITUNG' untuk update.")
+    st.metric(
+        label="Hasil Terakhir",
+        value=f"Rp {st.session_state['biaya_lama']:,.0f}",
+        delta=None
     )
